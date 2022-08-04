@@ -1,0 +1,105 @@
+body { 
+    background: #ECEFF1; 
+    color: rgba(0,0,0,0.87); 
+    font-family: Roboto, Helvetica, Arial, sans-serif; 
+    margin: 0; 
+    padding: 0; 
+}
+
+#gamebox { 
+    background: white; 
+    max-width: 450px; 
+    min-width: 450px; 
+    margin: 100px auto 16px;
+    padding: 32px 24px; 
+    border-radius: 3px; 
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); 
+}
+
+#gamebox h1 { 
+    font-size: 22px; 
+    margin: 0 0 8px;
+}
+
+#gamebox h2 { 
+    font-size: 12px; 
+    font-weight: 300; 
+    color: rgba(0,0,0,0.6); 
+    margin: 0 0 8px; 
+}
+
+#sig { 
+    color: rgba(0,0,0,0.4); 
+    text-align: center; 
+    font-size: 13px; 
+}
+
+#board {
+    display: flex;
+    justify-content: center;
+    font-size: 0;
+    text-align: center;
+    --s: 20px;
+    --m: 1px;
+    --f: calc(var(--s) + 4 * var(--m) - 1px);
+}
+
+.cell div {
+    display: inline-block;
+    font-size: initial; 
+    height: var(--s);
+    width: calc(var(--s) * 1.1547);
+    margin: 0px calc(var(--s) / 4 + 2px) calc(var(--m) - var(--s) * 0.5) calc(var(--s) / 4 + 2px);
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    background: gray;
+}
+.cell div:hover {
+    height: calc(var(--s) - 2px);
+    width: calc((var(--s) - 2px) * 1.1547);
+    margin: 1px calc(var(--s) / 4 + 3px) calc(var(--m) - var(--s) * 0.5 + 1px) calc(var(--s) / 4 + 3px);
+}
+
+.line1host {
+    height: 225px;
+    position: relative;
+    border-bottom: 4px solid blue;
+    border-right: solid blue;
+    -moz-transform: rotate(59.3deg);
+    -webkit-transform: rotate(59.3deg);
+    transform: rotate(59.3deg);
+    left: 100px;
+    bottom: 61px;
+}
+.line1guest {
+    height: 225px;
+    position: relative;
+    border-bottom: 4px solid red;
+    border-right: solid red;
+    -moz-transform: rotate(-59.3deg);
+    -webkit-transform: rotate(-59.3deg);
+    transform: rotate(-59.3deg);
+    left: 310px;
+    bottom: 61px;
+}
+.line2host {
+    height: 225px;
+    position: relative;
+    border-bottom: 4px solid blue;
+    border-right: solid blue;
+    -moz-transform: rotate(59.3deg);
+    -webkit-transform: rotate(59.3deg);
+    transform: rotate(59.3deg);
+    right: 100px;
+    top: 72px;
+}
+.line2guest {
+    height: 225px;
+    position: relative;
+    border-bottom: 4px solid red;
+    border-right: solid red;
+    -moz-transform: rotate(-59.3deg);
+    -webkit-transform: rotate(-59.3deg);
+    transform: rotate(-59.3deg);
+    right: 310px;
+    top: 72px;
+}
