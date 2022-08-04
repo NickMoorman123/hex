@@ -1,0 +1,14 @@
+{
+  "rules": {
+    // rules combine with OR clauses. In general, no reading or writing
+    ".read": false,
+    ".write": false,
+    "games": {
+    	"$gameID": {
+        // within games, for a particular game, if you are the host, if you are the guest, or if there is not yet a guest, you may read and write
+        ".read": "root.child('games').child($gameID).child('host').val() === auth.uid || root.child('games').child($gameID).child('guest').val() === auth.uid || root.child('games').child($gameID).child('guest').val() === null",
+        ".write": "root.child('games').child($gameID).child('host').val() === auth.uid || root.child('games').child($gameID).child('guest').val() === auth.uid || root.child('games').child($gameID).child('guest').val() === null"
+      }
+    }
+  }
+}

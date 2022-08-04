@@ -1,7 +1,20 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.9.1/firebase-app.js";
-import { getDatabase, ref, get, update, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/9.9.1/firebase-database.js";
+import { getDatabase, ref, get, update, onValue, onDisconnect, remove } from "https://www.gstatic.com/firebasejs/9.9.1/firebase-database.js";
 import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.9.1/firebase-auth.js";
 
+/*
+Interacting with the Firebase Realtime Database is done with getters, setters, and listeners:
+-The get function provides a snapshot of the data in the database reference provided at the time the
+get function call (asynchronously) reached Google's server
+-The update function sends a request out to add or edit information to your provided reference
+-The onValue function is a listener that reacts when there are changes to the database, which would
+include any changes you made
+-The onDisconnect function is a listener that reacts when the browser leaves the page
+
+Permissions to read and write are determined by Firebase Rules
+*/
+
+// this looks crazy insecure but is actually perfectly correct to include per Firebase instructions
 const firebaseConfig = { 
 apiKey: "AIzaSyBp7KVrEne2uV3Rtk4U4p-UYuonO-jBmd8",
 authDomain: "hex-game-d982b.firebaseapp.com",
@@ -105,7 +118,8 @@ function clickCell(row, col) {
         });
     }
 }
- 
+
+// depth-first search to see if we can reach one end of the board from the other
 function checkWin() {
     get(gameRef).then((snapshot) => {
         let gameBoard = snapshot.val().board;
@@ -125,6 +139,8 @@ function checkWin() {
             }
         }
 
+        // directions is a counter-clockwise list of the ways to move to adjacent hexagons
+        // each time we move, if we can continue moving, we will check a left turn, continuing straight, or a right turn
         let directions = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
         function move(r, c, dir) {
             if (r == -1 || r == 11 || c == -1 || c == 11) return false;
@@ -183,14 +199,6 @@ function addGoals() {
         return;
     }
 
-    if (isHost) {
-        largeHeader.textContent = `Provide the link below to your opponent`;
-        smallHeader.textContent =  window.location.origin;
-    } else {
-        largeHeader.textContent = `Your turn!`;
-        smallHeader.innerHTML = `Place tiles to create a path connecting the <u style='color:red;'> goals </u>`;
-    }
-
     addCells();
     addGoals();
 
@@ -198,18 +206,14 @@ function addGoals() {
         if (user) {
             let playerID = user.uid;
             let gameID = makeid();
+
             if (isHost) {
                 gameRef = ref(firebaseDB, `games/${gameID}`);
             } else {
                 gameRef = ref(firebaseDB, `games/${window.location.search.substring(8)}`);
             }
-            onDisconnect(gameRef).remove().catch((error) => {
-                console.error(error);
-            });
 
             if (isHost) {
-                smallHeader.textContent = `${window.location.origin}/?gameid=${gameID}`;
-
                 update(gameRef, {
                     host: playerID,
                     board: new Array(boardSize).fill(new Array(boardSize).fill(0))
@@ -220,15 +224,33 @@ function addGoals() {
                 update(gameRef, {
                     guest: playerID,
                     guestTurn: true
+                }).then(() => {
+                    get(gameRef).then((snapshot) => {
+                        if (snapshot.val().host == null) {
+                            largeHeader.textContent = `You are disconnected!`;
+                            smallHeader.innerHTML = `Go here to host a new game: <a href=\"index.html\">${window.location.origin}</a>`;
+                            remove(gameRef);
+                            return;
+                        }
+                    }).catch((error) => {
+                        largeHeader.textContent = `You are disconnected!`;
+                        smallHeader.innerHTML = `Go here to host a new game: <a href=\"index.html\">${window.location.origin}</a>`;
+                        console.error(error);
+                    });
                 }).catch((error) => {
                     console.error(error);
                 });
             }
 
+            // clean up database when we leave
+            onDisconnect(gameRef).remove().catch((error) => {
+                console.error(error);
+            });
+
             onValue(gameRef, (snapshot) => {
                 const game = snapshot.val();
 
-                if (game == null) {
+                if (game == null && largeHeader.textContent.substring(0, 4) != `You `) {
                     largeHeader.textContent = `Opponent has disconnected!`;
                     
                     if (isHost) {
@@ -239,47 +261,59 @@ function addGoals() {
                     return;
                 }
 
-                if (game.guest != null) {
-                    if (game.winner != null) {
-                        if (game.winner == isHost) {
-                            largeHeader.textContent = `You win!`;
-                        } else {
-                            largeHeader.textContent = `You lose!`;
-                        }
+                if (game.guest == null) {
+                    largeHeader.textContent = `Provide the link below to your opponent`;
+                    smallHeader.textContent = `${window.location.origin}/?gameid=${gameID}`;
+                    return;
+                }
 
-                        if (isHost) {
-                            smallHeader.textContent = `Refresh the page to host a new game`;
-                        } else {
-                            smallHeader.innerHTML = `Go here to host a new game: <a href=\"index.html\">${window.location.origin}</a>`;
-                        }
-                        return;
-                    }
-
-                    if (game.guestTurn === !isHost) {
-                        largeHeader.textContent = `Your turn!`;
+                if (game.winner != null) {
+                    if (game.winner == isHost) {
+                        largeHeader.textContent = `You win!`;
                     } else {
-                        largeHeader.textContent = `Opponent\'s turn!`;
-                        smallHeader.innerHTML = `Place tiles to create a path connecting the <u style='color:blue;'> goals </u>`;
+                        largeHeader.textContent = `You lose!`;
                     }
-        
-                    if (game.lastClick != null) {
-                        if (game.guestTurn) {
-                            cells[game.lastClick[0]][game.lastClick[1]].style.background = "blue";
-                        } else {
-                            cells[game.lastClick[0]][game.lastClick[1]].style.background = "red";
-                        }
+
+                    if (isHost) {
+                        smallHeader.textContent = `Refresh the page to host a new game`;
+                    } else {
+                        smallHeader.innerHTML = `Go here to host a new game: <a href=\"index.html\">${window.location.origin}</a>`;
+                    }
+                    return;
+                }
+
+                if (isHost) {
+                    smallHeader.innerHTML = `Place tiles to create a path connecting the <u style='color:blue;'> goals </u>`;
+                } else {
+                    smallHeader.innerHTML = `Place tiles to create a path connecting the <u style='color:red;'> goals </u>`;
+                }
+
+                if (game.guestTurn == !isHost) {
+                    largeHeader.textContent = `Your turn!`;
+                } else {
+                    largeHeader.textContent = `Opponent\'s turn!`;
+                }
+
+                console.log("asdf");
+
+                if (game.lastClick != null) {
+                    if (game.guestTurn) {
+                        cells[game.lastClick[0]][game.lastClick[1]].style.background = "blue";
+                    } else {
+                        cells[game.lastClick[0]][game.lastClick[1]].style.background = "red";
                     }
                 }
+
+                console.log("asdf");
             });
         } else {
-            //logged out
+            // logged out. Nothing to do
         }
     })
 
     signInAnonymously(firebaseAuth).catch((error) => {
         var errorCode = error.code;
         var errorMessage = error.message;
-        // ...
         console.log(errorCode, errorMessage);
     });
 })();
