@@ -119,6 +119,19 @@ function clickCell(row, col) {
     }
 }
 
+function addGoals() {
+    let line1 = document.querySelector(".line1");
+    let line2 = document.querySelector(".line2");
+
+    if (isHost) {
+        line1.className = "line1host";
+        line2.className = "line2host";
+    } else {
+        line1.className = "line1guest";
+        line2.className = "line2guest";
+    }
+}
+
 // depth-first search to see if we can reach one end of the board from the other
 function checkWin() {
     get(gameRef).then((snapshot) => {
@@ -178,19 +191,6 @@ function checkWin() {
 
 function fixedModSix(n) {
     return ((n % 6) + 6) % 6;
-}
-
-function addGoals() {
-    let line1 = document.querySelector(".line1");
-    let line2 = document.querySelector(".line2");
-
-    if (isHost) {
-        line1.className = "line1host";
-        line2.className = "line2host";
-    } else {
-        line1.className = "line1guest";
-        line2.className = "line2guest";
-    }
 }
 
 (function () {
@@ -294,8 +294,6 @@ function addGoals() {
                     largeHeader.textContent = `Opponent\'s turn!`;
                 }
 
-                console.log("asdf");
-
                 if (game.lastClick != null) {
                     if (game.guestTurn) {
                         cells[game.lastClick[0]][game.lastClick[1]].style.background = "blue";
@@ -303,8 +301,6 @@ function addGoals() {
                         cells[game.lastClick[0]][game.lastClick[1]].style.background = "red";
                     }
                 }
-
-                console.log("asdf");
             });
         } else {
             // logged out. Nothing to do
