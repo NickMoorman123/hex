@@ -16,13 +16,13 @@ Permissions to read and write are determined by Firebase Rules
 
 // this looks crazy insecure but is actually perfectly correct to include per Firebase instructions
 const firebaseConfig = { 
-apiKey: "AIzaSyBp7KVrEne2uV3Rtk4U4p-UYuonO-jBmd8",
-authDomain: "hex-game-d982b.firebaseapp.com",
-databaseURL: "https://hex-game-d982b-default-rtdb.firebaseio.com",
-projectId: "hex-game-d982b",
-storageBucket: "hex-game-d982b.appspot.com",
-messagingSenderId: "393175293244",
-appId: "1:393175293244:web:a20d0d264c06835382d239"
+apiKey: `AIzaSyBp7KVrEne2uV3Rtk4U4p-UYuonO-jBmd8`,
+authDomain: `hex-game-d982b.firebaseapp.com`,
+databaseURL: `https://hex-game-d982b-default-rtdb.firebaseio.com`,
+projectId: `hex-game-d982b`,
+storageBucket: `hex-game-d982b.appspot.com`,
+messagingSenderId: `393175293244`,
+appId: `1:393175293244:web:a20d0d264c06835382d239`
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -30,286 +30,266 @@ const firebaseDB = getDatabase(firebaseApp);
 const firebaseAuth = getAuth();
 
 var gameRef;
-const isHost = setHost();
+var isHost;
 const largeHeader = document.getElementById(`large`);
 const smallHeader = document.getElementById(`small`);
 const boardSize = 11;
-const cellDivs = document.querySelector(".cell");
-const cells = new Array(boardSize).fill(null).map(()=> 
-             (new Array(boardSize).fill(null).map(()=> 
-             (document.createElement("div")))));
+const cellDivs = document.querySelector(`.cell`);
+const cells = [...new Array(boardSize)].map(() => 
+                [...new Array(boardSize)].map(() => 
+                    document.createElement(`div`)));
+const hostCell = 1;
+const guestCell = 2;
 
-function validateURL() {
-    if (window.location.search == "") {
-        return true;
+function parseURL() {
+    if (window.location.search.length == 0) {
+        isHost = true;
+        return;
     }
-    if (window.location.search.substring(0, 8) == "?gameid=") {
-        return true;
+    isHost = false;
+
+    if (window.location.search.substring(0, 8) != `?gameid=`) {
+        window.location.replace(window.location.origin);
     }
-    return false;
-}
-      
-function setHost() {
-    if (window.location.search == "") {
-        return true;
-    }
-    return false;
 }
 
 function makeid() {
-    let result = ``;
-    let characters = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789`;
-    let charactersLength = characters.length;
-    for (let i = 0; i < 30; i++) {
-      result += characters.charAt(Math.floor(Math.random() * charactersLength));
-   }
-   return result;
+    return [...new Array(30)].map(() => randomChar()).join(``);
 }
 
+function randomChar() {
+    const characters = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789`;
+    const charactersLength = characters.length;
+    return characters.charAt(Math.floor(Math.random() * charactersLength))
+}
+
+// We initialize with these loops because the grid is turned 45 degrees on its side, and it makes things easy to add the cells top to bottom
 function addCells() {
     for (let i = boardSize - 1; i > 0; i--) {
-        let r = 0;
-        let c = i;
-        while (r < boardSize && c < boardSize) {
-            cells[r][c].addEventListener("click", clickCell(r, c));
-            cellDivs.appendChild(cells[r][c]);
-            r++;
-            c++;
+        let row = 0;
+        let col = i;
+        while (col < boardSize) {
+            cells[row][col].addEventListener(`click`, clickCell(row, col));
+            cellDivs.appendChild(cells[row][col]);
+            row++;
+            col++;
         }
-        const br = document.createElement("br");
-        cellDivs.appendChild(br);
+        cellDivs.appendChild(document.createElement(`br`));
     }
     for (let i = 0; i < boardSize; i++) {
-        let r = i;
-        let c = 0;
-        while (r < boardSize && c < boardSize) {
-            cells[r][c].addEventListener("click", clickCell(r, c));
-            cellDivs.appendChild(cells[r][c]);
-            r++;
-            c++;
+        let row = i;
+        let col = 0;
+        while (row < boardSize) {
+            cells[row][col].addEventListener(`click`, clickCell(row, col));
+            cellDivs.appendChild(cells[row][col]);
+            row++;
+            col++;
         }
-        const br = document.createElement("br");
-        cellDivs.appendChild(br);
+        cellDivs.appendChild(document.createElement(`br`));
     }
 }
 
 function clickCell(row, col) {
-    return function() {
-        get(gameRef).then((snapshot) => {
-            if (!(snapshot.val().guestTurn == !isHost)) return;
+    return () => get(gameRef).then((snapshot) => {
+        if (snapshot.val().guestTurn != !isHost) return;
 
-            let tempBoard = snapshot.val().board;
-            if (tempBoard[row][col] > 0) return;
-            
-            tempBoard[row][col]++;
-            if (!isHost) tempBoard[row][col]++;
+        let newBoard = snapshot.val().board;
+        if (newBoard[row][col] != 0) return;
+        
+        newBoard[row][col] = isHost ? hostCell : guestCell;
 
-            update(gameRef, {
-                board: tempBoard,
-                lastClick: [row, col],
-                guestTurn: !snapshot.val().guestTurn
-            }).then(() => {
-                checkWin();
-            }).catch((error) => {
-                console.error(error);
-            });
-        }).catch((error) => {
+        let updateData = {
+            board: newBoard,
+            lastClick: [row, col],
+            guestTurn: !snapshot.val().guestTurn
+        };
+
+        if (checkWin(newBoard)) {
+            updateData.winner = isHost;
+        }
+
+        update(gameRef, updateData).catch((error) => {
+            largeHeader.textContent = error;
             console.error(error);
         });
-    }
-}
-
-function addGoals() {
-    let line1 = document.querySelector(".line1");
-    let line2 = document.querySelector(".line2");
-
-    if (isHost) {
-        line1.className = "line1host";
-        line2.className = "line2host";
-    } else {
-        line1.className = "line1guest";
-        line2.className = "line2guest";
-    }
-}
-
-// depth-first search to see if we can reach one end of the board from the other
-function checkWin() {
-    get(gameRef).then((snapshot) => {
-        let gameBoard = snapshot.val().board;
-        let visited = new Array(boardSize).fill(null).map(()=>(new Array(boardSize).fill(null).map(()=>(false))));
-        let id;
-
-        if (isHost) {
-            id = 1;
-        } else {
-            id = 2;
-            for (let i = 1; i < 11; i++) {
-                for (let j = 0; j < i; j++) {
-                    const tempCell = gameBoard[i][j];
-                    gameBoard[i][j] = gameBoard[j][i];
-                    gameBoard[j][i] = tempCell;
-                }
-            }
-        }
-
-        // directions is a counter-clockwise list of the ways to move to adjacent hexagons
-        // each time we move, if we can continue moving, we will check a left turn, continuing straight, or a right turn
-        let directions = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
-        function move(r, c, dir) {
-            if (r == -1 || r == 11 || c == -1 || c == 11) return false;
-            if (gameBoard[r][c] != id) return false;
-            if (visited[r][c]) return false;
-            visited[r][c] = true;
-
-            if (r == 10) return true;
-
-            let newDir = fixedModSix(dir + 1);
-            if (move(r + directions[newDir][0], c + directions[newDir][1], newDir)) return true;
-            
-            if (move(r + directions[dir][0], c + directions[dir][1], dir)) return true;
-
-            newDir = fixedModSix(dir - 1);
-            if (move(r + directions[newDir][0], c + directions[newDir][1], newDir)) return true;
-
-            return false;
-        }
-
-        for (let c = 10; c > -1; c--) {
-            if (move(0, c, 0)) {
-                update(gameRef, {
-                    winner: isHost
-                }).catch((error) => {
-                    console.error(error);
-                });
-            }
-        }
-
     }).catch((error) => {
         console.error(error);
     });
+}
+
+function addGoals() {
+    let line1 = document.querySelector(`.line1`);
+    let line2 = document.querySelector(`.line2`);
+
+    line1.className = isHost ? `line1host` : `line1guest`;
+    line2.className = isHost ? `line2host` : `line2guest`;
+}
+
+// depth-first search to see if we can reach one end of the board from the other
+function checkWin(gameBoard) {
+    let visited = [...new Array(boardSize)].map(() => new Array(boardSize).fill(false));
+
+    // directions is a circular list of the ways to move to adjacent hexagons, counter-clockwise for host
+    // but we need to mirror them for the guest since the guest has mirrored goal sides
+    if (isHost) {
+        let directions = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
+        for (let col = boardSize - 1; col > -1; col--) {
+            if (move(gameBoard, visited, directions, 0, col, 0, boardSize - 1)) {
+                return true;
+            }
+        }
+    } else {
+        try {
+        let directions = [[0, -1], [-1, 0], [-1, 1], [0, 1], [1, 0], [1, -1]];
+        for (let row = 0; row < boardSize; row++) {
+            if (move(gameBoard, visited, directions, row, boardSize - 1, 0, 0)) {
+                return true;
+            }
+        }
+    } catch (err) {
+        largeHeader.textContent = err;
+    }
+    }
+    
+    return false;
+}
+
+// each time we move, if we can continue moving, we will check a left turn, continuing straight, or a right turn
+function move(gameBoard, visited, directions, row, col, dirIndex, goal) {
+    if (row == -1 || row == boardSize || col == -1 || col == boardSize) return false;
+    if (gameBoard[row][col] != (isHost ? hostCell : guestCell)) return false;
+    if (visited[row][col]) return false;
+
+    visited[row][col] = true;
+
+    if ((isHost ? row : col) == goal) return true;
+
+    let newDir = fixedModSix(dirIndex + 1);
+    if (move(gameBoard, visited, directions, row + directions[newDir][0], col + directions[newDir][1], newDir, goal)) return true;
+    
+    if (move(gameBoard, visited, directions, row + directions[dirIndex][0], col + directions[dirIndex][1], dirIndex, goal)) return true;
+
+    newDir = fixedModSix(dirIndex - 1);
+    if (move(gameBoard, visited, directions, row + directions[newDir][0], col + directions[newDir][1], newDir, goal)) return true;
+
+    return false;
 }
 
 function fixedModSix(n) {
     return ((n % 6) + 6) % 6;
 }
 
-(function () {
-    if (!validateURL()) {
-        window.location.replace(`${window.location.origin}/404`);
-        return;
+function setSmallHeaderOnDisconnect() {
+    if (isHost) {
+        smallHeader.textContent = `Refresh the page to host a new game`;
+    } else {
+        smallHeader.innerHTML = `Go here to host a new game: <a href=\"/\">${window.location.origin}</a>`;
     }
+}
+
+function setDBListener() {
+    onValue(gameRef, (snapshot) => {
+        const game = snapshot.val();
+
+        if (!game) {
+            largeHeader.textContent = `Opponent has disconnected!`;
+            
+            setSmallHeaderOnDisconnect();
+            return;
+        }
+
+        if (!game.guest) {
+            return;
+        }
+
+        if (game.lastClick) {
+            cells[game.lastClick[0]][game.lastClick[1]].style.background = game.guestTurn ? `blue` : `red`;
+        }
+
+        if (game.winner != null) {
+            if (game.winner == isHost) {
+                largeHeader.textContent = `You win!`;
+            } else {
+                largeHeader.textContent = `You lose!`;
+            }
+
+            setSmallHeaderOnDisconnect();
+            return;
+        }
+
+        if (isHost) {
+            smallHeader.innerHTML = `Place tiles to create a path connecting the <u style='color:blue;'> goals </u>`;
+        } else {
+            smallHeader.innerHTML = `Place tiles to create a path connecting the <u style='color:red;'> goals </u>`;
+        }
+
+        if (game.guestTurn == !isHost) {
+            largeHeader.textContent = `Your turn!`;
+        } else {
+            largeHeader.textContent = `Opponent\'s turn!`;
+        }
+    });
+}
+
+(function () {
+    largeHeader.textContent = `Connecting...`;
+    smallHeader.textContent = `...`;
+
+    parseURL();
 
     addCells();
     addGoals();
 
     onAuthStateChanged(firebaseAuth, (user) => {
-        if (user) {
-            let playerID = user.uid;
-            let gameID = makeid();
+        if (!user) {
+            return;
+            // logged out. Nothing to do
+        }
+        
+        let playerID = user.uid;
+        let gameID = makeid();
 
-            if (isHost) {
-                gameRef = ref(firebaseDB, `games/${gameID}`);
-            } else {
-                gameRef = ref(firebaseDB, `games/${window.location.search.substring(8)}`);
-            }
+        if (isHost) {
+            gameRef = ref(firebaseDB, `games/${gameID}`);
 
-            if (isHost) {
-                update(gameRef, {
-                    host: playerID,
-                    board: new Array(boardSize).fill(new Array(boardSize).fill(0))
-                }).catch((error) => {
-                    console.error(error);
-                });
-            } else {
-                update(gameRef, {
-                    guest: playerID,
-                    guestTurn: true
-                }).then(() => {
-                    get(gameRef).then((snapshot) => {
-                        if (snapshot.val().host == null) {
-                            largeHeader.textContent = `You are disconnected!`;
-                            smallHeader.innerHTML = `Go here to host a new game: <a href=\"index.html\">${window.location.origin}</a>`;
-                            remove(gameRef);
-                            return;
-                        }
-                    }).catch((error) => {
-                        largeHeader.textContent = `You are disconnected!`;
-                        smallHeader.innerHTML = `Go here to host a new game: <a href=\"index.html\">${window.location.origin}</a>`;
-                        console.error(error);
-                    });
-                }).catch((error) => {
-                    console.error(error);
-                });
-            }
-
-            // clean up database when we leave
-            onDisconnect(gameRef).remove().catch((error) => {
+            update(gameRef, {
+                host: playerID,
+                board: new Array(boardSize).fill(new Array(boardSize).fill(0))
+            }).catch((error) => {
                 console.error(error);
             });
 
-            onValue(gameRef, (snapshot) => {
-                const game = snapshot.val();
+            largeHeader.textContent = `Provide the link below to your opponent`;
+            let gameLink = `${window.location.origin}/?gameid=${gameID}`;
+            smallHeader.innerHTML = `${gameLink}\n<button onclick=\"navigator.clipboard.writeText(\'${gameLink}\')\">Copy Link</button>`;
 
-                if (game == null && largeHeader.textContent.substring(0, 4) != `You `) {
-                    largeHeader.textContent = `Opponent has disconnected!`;
-                    
-                    if (isHost) {
-                        smallHeader.textContent = `Refresh the page to host a new game`;
-                    } else {
-                        smallHeader.innerHTML = `Go here to host a new game: <a href=\"index.html\">${window.location.origin}</a>`;
-                    }
-                    return;
-                }
-
-                if (game.guest == null) {
-                    largeHeader.textContent = `Provide the link below to your opponent`;
-                    smallHeader.textContent = `${window.location.origin}/?gameid=${gameID}`;
-                    return;
-                }
-
-                if (game.winner != null) {
-                    if (game.winner == isHost) {
-                        largeHeader.textContent = `You win!`;
-                    } else {
-                        largeHeader.textContent = `You lose!`;
-                    }
-
-                    if (isHost) {
-                        smallHeader.textContent = `Refresh the page to host a new game`;
-                    } else {
-                        smallHeader.innerHTML = `Go here to host a new game: <a href=\"index.html\">${window.location.origin}</a>`;
-                    }
-                    return;
-                }
-
-                if (isHost) {
-                    smallHeader.innerHTML = `Place tiles to create a path connecting the <u style='color:blue;'> goals </u>`;
-                } else {
-                    smallHeader.innerHTML = `Place tiles to create a path connecting the <u style='color:red;'> goals </u>`;
-                }
-
-                if (game.guestTurn == !isHost) {
-                    largeHeader.textContent = `Your turn!`;
-                } else {
-                    largeHeader.textContent = `Opponent\'s turn!`;
-                }
-
-                if (game.lastClick != null) {
-                    if (game.guestTurn) {
-                        cells[game.lastClick[0]][game.lastClick[1]].style.background = "blue";
-                    } else {
-                        cells[game.lastClick[0]][game.lastClick[1]].style.background = "red";
-                    }
-                }
-            });
+            setDBListener();
         } else {
-            // logged out. Nothing to do
+            gameRef = ref(firebaseDB, `games/${window.location.search.substring(8)}`);
+
+            get(gameRef).then((snapshot) => {
+                if (!snapshot.val()) {
+                    largeHeader.textContent = `Invalid game link!`;
+                    setSmallHeaderOnDisconnect();
+                    remove(gameRef);
+                    return;
+                }
+
+                update(gameRef, {
+                    guest: playerID,
+                    guestTurn: true
+                }).then(() => setDBListener());
+            }).catch((error) => {
+                console.error(error);
+            });
         }
-    })
+
+        onDisconnect(gameRef).remove().catch((error) => {
+            console.error(error);
+        });
+    });
 
     signInAnonymously(firebaseAuth).catch((error) => {
-        var errorCode = error.code;
-        var errorMessage = error.message;
-        console.log(errorCode, errorMessage);
+        console.error(error);
     });
 })();
